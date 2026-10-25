@@ -371,7 +371,27 @@
 
     <!-- One line under the clock: CPU, free memory and free storage. Off by default; a theme can set
          "show_stats": true. Nothing is read, and the clock does not move, while this is false. -->
-    <bool name="show_stats">false</bool>
+    <bool name="show_stats">true</bool>
+
+    <!-- Fork (Thomas). Weather under the top-right pills: temperature and conditions now, today's max/min, the
+         rain-snow line and sunrise/sunset, from Open-Meteo (MeteoSwiss ICON-CH models first). The city is looked
+         up once by name; weather_lat / weather_lon (decimal degrees) skip the lookup. Refreshed every
+         weather_refresh_minutes while Home is on screen. Theme keys: "show_weather", "weather_city",
+         "weather_lat", "weather_lon", "weather_refresh_minutes". -->
+    <bool name="show_weather">true</bool>
+    <string name="weather_city" translatable="false">Saint-Gervais-les-Bains</string>
+    <string name="weather_lat" translatable="false"></string>
+    <string name="weather_lon" translatable="false"></string>
+    <integer name="weather_refresh_minutes">30</integer>
+
+    <!-- Fork (Thomas). Night mode: after night_idle_minutes without a key on Home, between night_from and
+         night_to o'clock (the window may cross midnight), the screen goes black with a dimmed clock and tomorrow's
+         weather; any key wakes it (and is swallowed). Theme keys: "night_mode", "night_idle_minutes",
+         "night_from", "night_to". -->
+    <bool name="night_mode">true</bool>
+    <integer name="night_idle_minutes">10</integer>
+    <integer name="night_from">21</integer>
+    <integer name="night_to">7</integer>
 
     <!-- Time-of-day backdrop behind everything: a dark gradient that follows the clock, with a warm
          horizon glow around sunrise and sunset. 0 keeps the plain background (the default); 1 to 100

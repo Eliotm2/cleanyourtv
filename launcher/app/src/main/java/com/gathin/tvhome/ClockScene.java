@@ -70,11 +70,25 @@ final class ClockScene {
         setGlow(PALETTE[colorIndex]);
     }
 
+    /** Fork (Thomas): the alpha start() fades the content to; 1 unless the night mode dimmed it. */
+    private float contentAlpha = 1f;
+
+    void setDimmed(float alpha) {
+        contentAlpha = alpha;
+    }
+
+    /** Fork (Thomas): plain black behind the clock, whatever the config says (night mode). */
+    void plainBlack() {
+        wallpaperShown = true;
+        wallpaperFile = null;
+        ambient.setBackground(null);
+    }
+
     void start() {
         content.setAlpha(0f);
         content.post(() -> {
             placeClock();
-            content.animate().alpha(1f).setDuration(1200).start();
+            content.animate().alpha(contentAlpha).setDuration(1200).start();
         });
         handler.removeCallbacks(tick);
         handler.postDelayed(tick, MOVE_MS);

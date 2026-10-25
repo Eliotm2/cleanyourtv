@@ -133,6 +133,12 @@ final class Config {
     final boolean showHomeSettingsShortcut;
     /** One line under the clock: CPU, free memory, free storage. Off unless config or a theme turns it on. */
     final boolean showStats;
+    // Fork (Thomas): set after construction in load(), to leave the positional constructor alone.
+    boolean showWeather;
+    String weatherCity = "", weatherLat = "", weatherLon = "";
+    int weatherRefreshMinutes = 30;
+    boolean nightMode;
+    int nightIdleMinutes = 10, nightFrom = 21, nightTo = 7;
     /** App library pill after the last Home row (config.xml app_library). */
     final boolean appLibrary;
     /** OK directly toggles Home membership in the library (app_library_selection). */
@@ -622,7 +628,27 @@ final class Config {
         Festival festival = json == null ? Festival.NONE : Festival.parse(string(json, "festival", ""),
                 string(json, "festival_until", ""), string(json, "greeting", ""), string(json, "accent_color", ""));
 
-        return new Config(dock, fillDock, hidden, libraryApps, liveTv, liveTvAction, liveTvInputId, packageMap(launchActions), packageMap(appLabels),
+        boolean showWeather = res.getBoolean(R.bool.show_weather);
+        String weatherCity = res.getString(R.string.weather_city).trim();
+        String weatherLat = res.getString(R.string.weather_lat).trim();
+        String weatherLon = res.getString(R.string.weather_lon).trim();
+        int weatherRefresh = res.getInteger(R.integer.weather_refresh_minutes);
+        boolean nightMode = res.getBoolean(R.bool.night_mode);
+        int nightIdle = res.getInteger(R.integer.night_idle_minutes);
+        int nightFrom = res.getInteger(R.integer.night_from);
+        int nightTo = res.getInteger(R.integer.night_to);
+        if (json != null) {
+            showWeather = bool(json, "show_weather", showWeather);
+            weatherCity = string(json, "weather_city", weatherCity);
+            weatherLat = string(json, "weather_lat", weatherLat);
+            weatherLon = string(json, "weather_lon", weatherLon);
+            weatherRefresh = integer(json, "weather_refresh_minutes", weatherRefresh, 5, 1440);
+            nightMode = bool(json, "night_mode", nightMode);
+            nightIdle = integer(json, "night_idle_minutes", nightIdle, 1, 1440);
+            nightFrom = integer(json, "night_from", nightFrom, 0, 23);
+            nightTo = integer(json, "night_to", nightTo, 0, 23);
+        }
+        Config c = new Config(dock, fillDock, hidden, libraryApps, liveTv, liveTvAction, liveTvInputId, packageMap(launchActions), packageMap(appLabels),
                 packageMap(appBanners), panelService, panelAction, panelExtra, coocaaSources, inputAction, inputUriScheme, Math.max(1, columns),
                 Math.max(0, rowsBelow), animations, advancedEffects, shamsi, greetingName, moduleCards, reducedMotion, bootToLiveTv,
                 openOnStartChoice, dockTitle, dockRow, topMenu, launcherSettingsButton, reorderButton, showNetworkPill, showInputsPill,
@@ -636,6 +662,16 @@ final class Config {
                 consumeVolumeKeys, powerOnHome, wifiStatusWarnings, topBarApps, showGreeting, headerWhite, clockWallpaper,
                 Math.max(0, Math.min(90, clockWallpaperDim)), clockGlow, glassStyle, singleRow && dockRow, dockBandAll, lunar, lunarOffset,
                 dateBelowClock);
+        c.showWeather = showWeather && !weatherCity.isEmpty();
+        c.weatherCity = weatherCity;
+        c.weatherLat = weatherLat;
+        c.weatherLon = weatherLon;
+        c.weatherRefreshMinutes = weatherRefresh;
+        c.nightMode = nightMode;
+        c.nightIdleMinutes = nightIdle;
+        c.nightFrom = nightFrom;
+        c.nightTo = nightTo;
+        return c;
     }
 
     /**

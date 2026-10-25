@@ -53,6 +53,7 @@ import android.text.TextPaint;
 import android.text.TextUtils;
 import android.text.style.ForegroundColorSpan;
 import android.util.TypedValue;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
@@ -105,7 +106,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     static int COLUMNS = 4;
     private boolean rtlAppGrid;
     private static final long MINUTE_MS = 60_000L;
-    private static final long STATS_MS = 10_000L;
+    private static final long STATS_MS = 5_000L;   // fork (Thomas): 10 s upstream
     /**
      * 2025-01-01. TVs without a clock battery boot at the epoch (08:00 in China) and keep it until network
      * time arrives; the clock, date and greeting stay hidden before then.
@@ -184,6 +185,19 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private boolean lunar;
     private int lunarOffset;
     private TextView stats;
+    // Fork (Thomas): weather block under the pills, and the night mode.
+    private View weatherView;
+    private TextView weatherTemp, weatherDesc, weatherDetail;
+    private boolean showWeather;
+    private String weatherCity, weatherLat, weatherLon;
+    private long weatherRefreshMs;
+    private HandlerThread weatherThread;
+    private volatile Handler weatherBg;
+    private boolean nightMode;
+    private long nightIdleMs;
+    private int nightFrom, nightTo;
+    private long lastInteractionMs;
+    private final Runnable showNight = () -> startActivity(new Intent(this, ClockActivity.class).putExtra(ClockActivity.EXTRA_NIGHT, true));
     private List<RaceWeekend.Race> raceCalendar;
     private View racePanel;
     private TextView raceKicker, raceHeadline, raceSessions;
@@ -293,6 +307,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         @Override
         public void onAvailable(@NonNull Network network) {
             handler.post(MainActivity.this::updateWifiLabel);
+            handler.post(MainActivity.this::refreshWeatherIfStale);
         }
 
         @Override
@@ -364,6 +379,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             // The pill follows the network callbacks and each return to Home; only the diya's flame follows the
             // signal level, so only it needs this minute's binder calls (about 7 ms on the UI thread).
             if (festive) updateWifiLabel();
+            checkNight();
             sky.update();
             wallpaperPlayer.update();
             handler.postDelayed(this, MINUTE_MS);
@@ -480,6 +496,20 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         raceHeadline = findViewById(R.id.raceHeadline);
         raceSessions = findViewById(R.id.raceSessions);
         showStats = cfg.showStats;
+        weatherView = findViewById(R.id.weather);
+        weatherTemp = findViewById(R.id.weatherTemp);
+        weatherDesc = findViewById(R.id.weatherDesc);
+        weatherDetail = findViewById(R.id.weatherDetail);
+        showWeather = cfg.showWeather;
+        weatherCity = cfg.weatherCity;
+        weatherLat = cfg.weatherLat;
+        weatherLon = cfg.weatherLon;
+        weatherRefreshMs = cfg.weatherRefreshMinutes * MINUTE_MS;
+        nightMode = cfg.nightMode;
+        nightIdleMs = cfg.nightIdleMinutes * MINUTE_MS;
+        nightFrom = cfg.nightFrom;
+        nightTo = cfg.nightTo;
+        if (showWeather) showWeather(Weather.cached(this));
         shamsi = cfg.shamsiDate;
         lunarDate = findViewById(R.id.lunarDate);
         lunar = cfg.lunarDate;
@@ -959,6 +989,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             pillsShown = true;
         }
         if (showStats) startStats();
+        if (showWeather) startWeather();
         sky.update();
         wallpaperPlayer.start();
         handler.postDelayed(minuteTick, MINUTE_MS);
@@ -1121,7 +1152,95 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     private void restartIdleClock() {
         root.removeCallbacks(showIdleClock);
-        if (idleClockMs > 0) root.postDelayed(showIdleClock, idleClockMs);
+        root.removeCallbacks(showNight);
+        lastInteractionMs = SystemClock.elapsedRealtime();
+        if (nightMode && inNightWindow()) root.postDelayed(showNight, nightIdleMs);
+        else if (idleClockMs > 0) root.postDelayed(showIdleClock, idleClockMs);
+    }
+
+    // ---- fork (Thomas): night mode ------------------------------------------------------------------
+
+    /** The night window, which may cross midnight (21 → 7). from == to: never. */
+    private boolean inNightWindow() {
+        int h = java.time.LocalTime.now().getHour();
+        if (nightFrom == nightTo) return false;
+        return nightFrom < nightTo ? h >= nightFrom && h < nightTo : h >= nightFrom || h < nightTo;
+    }
+
+    /** Each minute: Home left idle before the window opened still goes dark once it has, after the idle delay. */
+    private void checkNight() {
+        if (!nightMode || !inNightWindow() || !hasWindowFocus()) return;
+        long idle = SystemClock.elapsedRealtime() - lastInteractionMs;
+        if (idle >= nightIdleMs) {
+            root.removeCallbacks(showNight);
+            root.removeCallbacks(showIdleClock);
+            showNight.run();
+        }
+    }
+
+    // ---- fork (Thomas): weather ----------------------------------------------------------------------
+
+    private void showWeather(Weather.Data d) {
+        if (weatherView == null) return;
+        if (d == null) {
+            weatherView.setVisibility(View.GONE);
+            return;
+        }
+        android.content.res.Resources res = getResources();
+        Locale locale = res.getConfiguration().getLocales().get(0);
+        weatherTemp.setText(String.format(locale, "%d°", d.temp));
+        String[] descs = res.getStringArray(R.array.weather_desc);
+        weatherDesc.setText(descs[Weather.descIndex(d.code)]);
+        StringBuilder detail = new StringBuilder(getString(R.string.weather_max_min, d.max, d.min));
+        if (d.snowLine != null) appendStat(detail, getString(R.string.weather_snow_line, Weather.metres(locale, d.snowLine)));
+        if (d.sunrise != null && d.sunset != null) appendStat(detail, getString(R.string.weather_sun, d.sunrise, d.sunset));
+        weatherDetail.setText(detail);
+        weatherView.setVisibility(View.VISIBLE);
+    }
+
+    /** Fetches now if the cached reading is older than the refresh period (or missing); the thread then keeps the rhythm. */
+    private void startWeather() {
+        if (weatherThread != null) return;
+        weatherThread = new HandlerThread("weather");
+        weatherThread.start();
+        Handler bg = new Handler(weatherThread.getLooper());
+        weatherBg = bg;
+        Weather.Data cached = Weather.cached(this);
+        long age = cached == null ? Long.MAX_VALUE : System.currentTimeMillis() - cached.fetchedAt;
+        long delay = age >= weatherRefreshMs ? 0 : weatherRefreshMs - age;
+        bg.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if (weatherBg != bg) return;
+                Weather.Data d = null;
+                try {
+                    d = Weather.fetch(MainActivity.this, weatherCity, weatherLat, weatherLon);
+                } catch (Exception e) {
+                    Log.w("Weather", "fetch failed: " + e);
+                }
+                Weather.Data shown = d;
+                if (shown != null) handler.post(() -> { if (weatherBg == bg) showWeather(shown); });
+                // A failure (no network yet at boot) is retried sooner; onAvailable also retries.
+                if (weatherBg == bg) bg.postDelayed(this, shown == null ? 2 * MINUTE_MS : weatherRefreshMs);
+            }
+        }, delay);
+    }
+
+    private void stopWeather() {
+        if (weatherThread == null) return;
+        weatherBg.removeCallbacksAndMessages(null);
+        weatherThread.quit();
+        weatherThread = null;
+        weatherBg = null;
+    }
+
+    /** A network came back: fetch now if the reading is stale, by restarting the reader. */
+    private void refreshWeatherIfStale() {
+        if (!showWeather || weatherThread == null) return;
+        Weather.Data cached = Weather.cached(this);
+        if (cached != null && System.currentTimeMillis() - cached.fetchedAt < weatherRefreshMs) return;
+        stopWeather();
+        startWeather();
     }
 
     @Override
@@ -1136,6 +1255,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         heroArt.animate().cancel();
         handler.removeCallbacks(minuteTick);
         stopStats();
+        stopWeather();
+        root.removeCallbacks(showNight);
         if (diya != null) diya.stop();
         cancelPendingFocusScroll();
         // Nothing of ours stays on screen over another app; an undecided prompt simply returns next time.
@@ -2076,8 +2197,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         if (cpu >= 0) line.append(getString(R.string.stats_cpu, cpu));
         long[] mem = memUsedOfTotalMb();
         if (mem != null) appendStat(line, getString(R.string.stats_memory, mem[0], mem[1]));
-        String free = formatGb(getResources(), Environment.getDataDirectory().getFreeSpace());
-        if (!free.isEmpty()) appendStat(line, getString(R.string.stats_storage, free));
+        // Fork (Thomas): CPU and memory only; the storage figure is left out.
         return StatsText.forLocale(line.toString(), getResources().getConfiguration().getLocales().get(0));
     }
 
