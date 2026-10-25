@@ -31,6 +31,8 @@ android {
         }
     }
 
+    testOptions { unitTests { includeAndroidResources = true } }   // fork (Thomas): Robolectric
+
     buildTypes {
         release {
             // R8 strips and optimises the code (AndroidX included): smaller APK, faster start on a slow TV CPU.
@@ -63,4 +65,5 @@ dependencies {
     // Test only (never in the APK): plain JVM tests for the module card validators, src/test.
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.json:json:20240303'   // fork (Thomas): the real org.json for WeatherTest
+    testImplementation 'org.robolectric:robolectric:4.14.1'   // fork (Thomas): starts MainActivity and ClockActivity on the JVM
 }
