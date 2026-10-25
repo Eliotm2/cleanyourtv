@@ -141,6 +141,7 @@ final class Config {
     int weatherRefreshMinutes = 30;
     boolean nightMode;
     int nightIdleMinutes = 10, nightFrom = 21, nightTo = 7;
+    int dockBottomRoomDp = 30;
     /** App library pill after the last Home row (config.xml app_library). */
     final boolean appLibrary;
     /** OK directly toggles Home membership in the library (app_library_selection). */
@@ -639,7 +640,9 @@ final class Config {
         int nightIdle = res.getInteger(R.integer.night_idle_minutes);
         int nightFrom = res.getInteger(R.integer.night_from);
         int nightTo = res.getInteger(R.integer.night_to);
+        int dockBottomRoom = res.getInteger(R.integer.dock_bottom_room);
         if (json != null) {
+            dockBottomRoom = integer(json, "dock_bottom_room", dockBottomRoom, 0, 120);
             showWeather = bool(json, "show_weather", showWeather);
             weatherCity = string(json, "weather_city", weatherCity);
             weatherLat = string(json, "weather_lat", weatherLat);
@@ -676,6 +679,7 @@ final class Config {
         c.nightIdleMinutes = nightIdle;
         c.nightFrom = nightFrom;
         c.nightTo = nightTo;
+        c.dockBottomRoomDp = Math.max(0, Math.min(120, dockBottomRoom));
         return c;
     }
 

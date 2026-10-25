@@ -644,7 +644,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             // Keep the hero below the header when the library is enabled on a short screen,
             // even when the theme requests an extra visible row below the dock.
             int shelfClearance = cfg.appLibrary ? hero.getMeasuredHeight() + (int) (40 * density) : 0;
-            int want = Math.max(shelfClearance, h - dockRow - gridRows - (int) (AppAdapter.BOTTOM_ROOM_DP * density));
+            // Fork (Thomas): dock_bottom_room in place of the fixed 30 dp (0: the next row sits entirely off screen).
+            int want = Math.max(shelfClearance, h - dockRow - gridRows - (int) (cfg.dockBottomRoomDp * density));
             // Where the rows cannot fit even at the smallest tile (3 rows with the title on), the title keeps its
             // room above the dock and the last rows run off the bottom instead of the title drawing over the clock.
             if (MainActivity.this.dockRow && cfg.dockTitle && rowsBelowDock > 0) want = Math.max(want, (int) (AppAdapter.TITLE_ROOM_DP * density));
@@ -1206,9 +1207,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         weatherTemp.setText(String.format(locale, "%d°", d.temp));
         String[] descs = res.getStringArray(R.array.weather_desc);
         weatherDesc.setText(descs[Weather.descIndex(d.code)]);
-        StringBuilder detail = new StringBuilder(getString(R.string.weather_max_min, d.max, d.min));
+        // Min before max, the snow line, no sunrise/sunset (Thomas: too much on the line; the sun stays in Data for later).
+        StringBuilder detail = new StringBuilder(getString(R.string.weather_min_max, d.min, d.max));
         if (d.snowLine != null) appendStat(detail, getString(R.string.weather_snow_line, Weather.metres(locale, d.snowLine)));
-        if (d.sunrise != null && d.sunset != null) appendStat(detail, getString(R.string.weather_sun, d.sunrise, d.sunset));
         weatherDetail.setText(detail);
         weatherView.setVisibility(View.VISIBLE);
     }

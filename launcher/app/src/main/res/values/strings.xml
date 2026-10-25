@@ -157,9 +157,8 @@
         <item>Showers</item><item>Snow showers</item><item>Thunderstorm</item><item>Thunderstorm with hail</item><item>—</item>
     </string-array>
     <string name="weather_now">%1$d°  %2$s</string>
-    <string name="weather_max_min">Max %1$d° · Min %2$d°</string>
+    <string name="weather_min_max">Min %1$d° · Max %2$d°</string>
     <string name="weather_snow_line">Snow above %1$s</string>
-    <string name="weather_sun">Sun %1$s – %2$s</string>
     <string name="weather_tomorrow">Tomorrow: %1$s · %2$d° / %3$d°</string>
     <string name="weather_city_state">Weather city: %1$s</string>
     <string name="weather_city_title">Weather city</string>

@@ -98,9 +98,8 @@
         <item>Averses</item><item>Averses de neige</item><item>Orage</item><item>Orage et grêle</item><item>—</item>
     </string-array>
     <string name="weather_now">%1$d°  %2$s</string>
-    <string name="weather_max_min">Max %1$d° · Min %2$d°</string>
+    <string name="weather_min_max">Min %1$d° · Max %2$d°</string>
     <string name="weather_snow_line">Neige dès %1$s</string>
-    <string name="weather_sun">Soleil %1$s – %2$s</string>
     <string name="weather_tomorrow">Demain : %1$s · %2$d° / %3$d°</string>
     <string name="weather_city_state">Ville météo : %1$s</string>
     <string name="weather_city_title">Ville météo</string>
