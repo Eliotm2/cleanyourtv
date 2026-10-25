@@ -102,6 +102,17 @@
     <string name="weather_snow_line">Neige dès %1$s</string>
     <string name="weather_tomorrow">Demain : %1$s · %2$d° / %3$d°</string>
     <string name="weather_city_state">Ville météo : %1$s</string>
+    <string name="remote_keys_state">Boutons de la télécommande : %1$d associés</string>
+    <string name="remote_keys_title">Boutons de la télécommande</string>
+    <string name="remote_keys_add">Associer un bouton…</string>
+    <string name="remote_keys_helper_off">Le service « Bouton Accueil » est désactivé. Active-le dans les réglages d\'accessibilité de la télé, puis reviens ici.</string>
+    <string name="remote_keys_open_accessibility">Ouvrir l\'accessibilité</string>
+    <string name="remote_keys_press">Appuie maintenant sur le bouton de la télécommande à associer (20 s). Les flèches, OK, Retour, Accueil et le volume ne peuvent pas l\'être.</string>
+    <string name="remote_keys_timeout">Aucun bouton reçu. Le service ne reçoit peut-être pas ce bouton : essaie-en un autre.</string>
+    <string name="remote_keys_pick_app">Ouvrir avec le bouton %1$s</string>
+    <string name="remote_keys_remove">Retirer ce bouton</string>
+    <string name="remote_keys_saved">%1$s ouvre maintenant %2$s</string>
+    <string name="remote_keys_entry">%1$s → %2$s</string>
     <string name="weather_city_title">Ville météo</string>
     <string name="weather_city_hint">Ville ou village, puis OK</string>
     <string name="weather_unavailable">Météo indisponible</string>

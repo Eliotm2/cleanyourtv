@@ -135,6 +135,15 @@ final class Config {
     final boolean showStats;
     /** Fork (Thomas): the weather city chosen in Launcher settings (launcher_settings). */
     static final String WEATHER_CITY_KEY = "weather_city";
+    /** Fork (Thomas): remote buttons learnt in Launcher settings, app_keys entries joined by ';'. */
+    static final String APP_KEYS_KEY = "app_keys_learnt";
+
+    static List<String> learntAppKeys(SharedPreferences choices) {
+        String raw = choices.getString(APP_KEYS_KEY, "");
+        List<String> out = new ArrayList<>();
+        for (String e : raw.split(";")) if (!e.trim().isEmpty()) out.add(e.trim());
+        return out;
+    }
     // Fork (Thomas): set after construction in load(), to leave the positional constructor alone.
     boolean showWeather;
     String weatherCity = "", weatherLat = "", weatherLon = "";
@@ -592,6 +601,8 @@ final class Config {
         SharedPreferences choices = ctx.getSharedPreferences(SETTINGS_NAME, Context.MODE_PRIVATE);
         // Unmounted storage looks like a theme reset; compare only once the file is readable.
         if (mounted) syncThemeChoices(choices, dir, file);
+        // Fork (Thomas): buttons learnt on the TV come after the theme's app_keys; for a keycode listed twice the last wins.
+        appKeys.addAll(learntAppKeys(choices));
         int chosenColumns = choices.getInt("columns", columns);
         if (chosenColumns >= 4 && chosenColumns <= 7) columns = chosenColumns;
         int chosenRows = choices.getInt(ROWS_BELOW_DOCK_KEY, rowsBelow);

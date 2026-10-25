@@ -33,6 +33,7 @@ public final class LauncherSettingsActivity extends Activity {
     private TextView followThemeChoice;
     private TextView openOnStartChoice;
     private TextView weatherCityChoice;   // fork (Thomas)
+    private TextView remoteKeysChoice;    // fork (Thomas)
     private int columns;
     private int rowsBelowDock;
     private int dockOpacity;
@@ -129,6 +130,8 @@ public final class LauncherSettingsActivity extends Activity {
             openOnStartChoice.setVisibility(View.VISIBLE);
             openOnStartChoice.setOnClickListener(v -> showOpenOnStartPicker());
         }
+        remoteKeysChoice = findViewById(R.id.remoteKeysChoice);
+        remoteKeysChoice.setOnClickListener(v -> showRemoteKeys());
         weatherCityChoice = findViewById(R.id.weatherCityChoice);
         weatherCityChoice.setOnClickListener(v -> showWeatherCityDialog());
         followThemeChoice = findViewById(R.id.followThemeChoice);
@@ -295,6 +298,7 @@ public final class LauncherSettingsActivity extends Activity {
                         : getString(R.string.wallpaper_theme_default)));
         openOnStartChoice.setText(getString(R.string.open_on_start_state, openOnStartLabel()));
         weatherCityChoice.setText(getString(R.string.weather_city_state, Config.load(this).weatherCity));
+        remoteKeysChoice.setText(getString(R.string.remote_keys_state, Config.learntAppKeys(choices).size()));
         followThemeChoice.setSelected(!hasOnTvChoices());
     }
 
@@ -303,6 +307,130 @@ public final class LauncherSettingsActivity extends Activity {
                 || choices.contains("animations") || choices.contains("advanced_effects")
                 || choices.contains(Config.WALLPAPER_CHOICE_KEY) || choices.contains(Config.DOCK_OPACITY_KEY)
                 || choices.contains(OpenOnStart.KEY) || choices.contains(Config.WEATHER_CITY_KEY);
+    }
+
+    // ---- fork (Thomas): remote buttons learnt on the TV ---------------------------------------------
+
+    private final android.os.Handler learnHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+
+    /** The list: every learnt button (tap to remove) and "Add a button…". */
+    private void showRemoteKeys() {
+        if (!HomeKeyService.isRunning()) {
+            new AlertDialog.Builder(this)
+                    .setTitle(R.string.remote_keys_title)
+                    .setMessage(R.string.remote_keys_helper_off)
+                    .setPositiveButton(R.string.remote_keys_open_accessibility, (d, w) -> open(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)))
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show();
+            return;
+        }
+        List<String> entries = Config.learntAppKeys(choices);
+        List<String> labels = new ArrayList<>();
+        for (String e : entries) {
+            String[] parts = e.split(":");
+            String key = parts[0].equals("scan") && parts.length >= 3 ? "scan " + parts[1] : keyName(parts[0]);
+            labels.add(getString(R.string.remote_keys_entry, key, appLabel(parts[parts.length - 1])));
+        }
+        labels.add(getString(R.string.remote_keys_add));
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.remote_keys_title)
+                .setItems(labels.toArray(new String[0]), (d, which) -> {
+                    if (which == entries.size()) learnRemoteKey();
+                    else confirmRemove(entries, which);
+                })
+                .show();
+    }
+
+    private void confirmRemove(List<String> entries, int index) {
+        new AlertDialog.Builder(this)
+                .setMessage(getString(R.string.remote_keys_remove))
+                .setPositiveButton(android.R.string.ok, (d, w) -> {
+                    List<String> kept = new ArrayList<>(entries);
+                    kept.remove(index);
+                    saveRemoteKeys(kept);
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    /** Waits 20 s for the helper to hand over the next non-navigation key, then asks which app it opens. */
+    private void learnRemoteKey() {
+        AlertDialog waiting = new AlertDialog.Builder(this)
+                .setTitle(R.string.remote_keys_add)
+                .setMessage(R.string.remote_keys_press)
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+        Runnable timeout = () -> {
+            HomeKeyService.learner = null;
+            if (waiting.isShowing()) {
+                waiting.dismiss();
+                Toast.makeText(this, R.string.remote_keys_timeout, Toast.LENGTH_LONG).show();
+            }
+        };
+        waiting.setOnDismissListener(d -> { HomeKeyService.learner = null; learnHandler.removeCallbacks(timeout); });
+        learnHandler.postDelayed(timeout, 20_000);
+        HomeKeyService.learner = (keyCode, scanCode) -> learnHandler.post(() -> {
+            HomeKeyService.learner = null;
+            learnHandler.removeCallbacks(timeout);
+            if (waiting.isShowing()) waiting.dismiss();
+            // A keycode Android names is matched by keycode; an unmapped button (KEYCODE_UNKNOWN) by its scancode.
+            String key = keyCode > 0 ? String.valueOf(keyCode) : scanCode > 0 ? "scan:" + scanCode : null;
+            if (key == null) {
+                Toast.makeText(this, R.string.remote_keys_timeout, Toast.LENGTH_LONG).show();
+                return;
+            }
+            pickAppFor(key, keyCode > 0 ? keyName(String.valueOf(keyCode)) : "scan " + scanCode);
+        });
+    }
+
+    private void pickAppFor(String key, String keyLabel) {
+        PackageManager pm = getPackageManager();
+        java.util.Map<String, String> apps = new java.util.TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+        for (String category : new String[] {Intent.CATEGORY_LEANBACK_LAUNCHER, Intent.CATEGORY_LAUNCHER}) {
+            for (ResolveInfo ri : pm.queryIntentActivities(new Intent(Intent.ACTION_MAIN).addCategory(category), 0)) {
+                if (ri.activityInfo == null || ri.activityInfo.packageName.equals(getPackageName())) continue;
+                apps.putIfAbsent(String.valueOf(ri.loadLabel(pm)), ri.activityInfo.packageName);
+            }
+        }
+        List<String> names = new ArrayList<>(apps.keySet());
+        new AlertDialog.Builder(this)
+                .setTitle(getString(R.string.remote_keys_pick_app, keyLabel))
+                .setItems(names.toArray(new String[0]), (d, which) -> {
+                    String pkg = apps.get(names.get(which));
+                    List<String> kept = new ArrayList<>();
+                    // One app per button: an earlier entry for the same key goes.
+                    for (String e : Config.learntAppKeys(choices)) if (!e.startsWith(key + ":")) kept.add(e);
+                    kept.add(key + ":" + pkg);
+                    saveRemoteKeys(kept);
+                    Toast.makeText(this, getString(R.string.remote_keys_saved, keyLabel, names.get(which)), Toast.LENGTH_LONG).show();
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void saveRemoteKeys(List<String> entries) {
+        if (entries.isEmpty()) choices.edit().remove(Config.APP_KEYS_KEY).apply();
+        else choices.edit().putString(Config.APP_KEYS_KEY, String.join(";", entries)).apply();
+        HomeKeyService.reloadConfig();   // the helper reads its config once at bind
+        changed();
+        refresh();
+    }
+
+    private String keyName(String code) {
+        try {
+            String name = android.view.KeyEvent.keyCodeToString(Integer.parseInt(code));
+            return name.startsWith("KEYCODE_") ? name.substring(8).replace('_', ' ') : name;
+        } catch (NumberFormatException e) {
+            return code;
+        }
+    }
+
+    private String appLabel(String pkg) {
+        try {
+            return String.valueOf(getPackageManager().getApplicationLabel(getPackageManager().getApplicationInfo(pkg, 0)));
+        } catch (PackageManager.NameNotFoundException e) {
+            return pkg;
+        }
     }
 
     /** Fork (Thomas): the weather city, typed with the remote's keyboard; empty puts the theme's or config.xml's back. */

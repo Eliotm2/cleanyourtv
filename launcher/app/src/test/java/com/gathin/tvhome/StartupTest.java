@@ -63,4 +63,18 @@ public class StartupTest {
         ClockActivity c = Robolectric.buildActivity(ClockActivity.class).setup().get();
         assertNotNull(c.findViewById(R.id.dreamContent));
     }
+
+    /** A button learnt in Launcher settings reaches the helper's app_keys, and the settings screen counts it. */
+    @Test
+    public void learntRemoteButtonIsAnAppKey() {
+        android.content.Context ctx = org.robolectric.RuntimeEnvironment.getApplication();
+        ctx.getSharedPreferences(com.gathin.tvhome.Config.SETTINGS_NAME, android.content.Context.MODE_PRIVATE).edit()
+                .putString(com.gathin.tvhome.Config.APP_KEYS_KEY, "190:com.teamsmart.videomanager.tv;scan:240:com.netflix.ninja").apply();
+        com.gathin.tvhome.Config cfg = com.gathin.tvhome.Config.load(ctx);
+        assertEquals("com.teamsmart.videomanager.tv", RemoteKeys.parseAppKeys(cfg.appKeys).get(190));
+        assertEquals("com.netflix.ninja", RemoteKeys.parseAppScancodes(cfg.appKeys).get(240));
+        LauncherSettingsActivity a = Robolectric.buildActivity(LauncherSettingsActivity.class).setup().get();
+        android.widget.TextView row = a.findViewById(R.id.remoteKeysChoice);
+        assertEquals(true, row.getText().toString().contains("2"));
+    }
 }

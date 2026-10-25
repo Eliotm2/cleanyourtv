@@ -161,6 +161,17 @@
     <string name="weather_snow_line">Snow above %1$s</string>
     <string name="weather_tomorrow">Tomorrow: %1$s · %2$d° / %3$d°</string>
     <string name="weather_city_state">Weather city: %1$s</string>
+    <string name="remote_keys_state">Remote buttons: %1$d set</string>
+    <string name="remote_keys_title">Remote buttons</string>
+    <string name="remote_keys_add">Add a button…</string>
+    <string name="remote_keys_helper_off">The \"Home button\" helper is off. Switch it on in the TV\'s Accessibility settings, then come back here.</string>
+    <string name="remote_keys_open_accessibility">Open Accessibility</string>
+    <string name="remote_keys_press">Press the remote button to set, now (20 s). The arrows, OK, Back, Home and volume cannot be set.</string>
+    <string name="remote_keys_timeout">No button received. The helper may not get this button: try another one.</string>
+    <string name="remote_keys_pick_app">Open with the button %1$s</string>
+    <string name="remote_keys_remove">Remove this button</string>
+    <string name="remote_keys_saved">%1$s now opens %2$s</string>
+    <string name="remote_keys_entry">%1$s → %2$s</string>
     <string name="weather_city_title">Weather city</string>
     <string name="weather_city_hint">Town or village, then OK</string>
     <string name="weather_unavailable">Weather unavailable</string>

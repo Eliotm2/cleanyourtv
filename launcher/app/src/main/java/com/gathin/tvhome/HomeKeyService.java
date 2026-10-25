@@ -79,6 +79,26 @@ public class HomeKeyService extends AccessibilityService {
     /** The bound helper, so the opt-in broadcast can arm it without waiting for a new connection. */
     private static HomeKeyService running;
 
+    // ---- fork (Thomas): learn mode for Launcher settings --------------------------------------------
+    /** Receives the next remote button pressed (on key up), then is cleared by the caller. */
+    interface KeyLearner { void onKey(int keyCode, int scanCode); }
+    static volatile KeyLearner learner;
+    /** Keys the learner never takes: navigation and the keys Android or the TV keep. */
+    private static final java.util.Set<Integer> LEARN_RESERVED = new java.util.HashSet<>(java.util.Arrays.asList(
+            KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
+            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_HOME,
+            KeyEvent.KEYCODE_VOLUME_UP, KeyEvent.KEYCODE_VOLUME_DOWN, KeyEvent.KEYCODE_VOLUME_MUTE, KeyEvent.KEYCODE_POWER,
+            KeyEvent.KEYCODE_WAKEUP, KeyEvent.KEYCODE_SLEEP));
+
+    /** Whether the helper is bound right now (the learn mode needs it). */
+    static boolean isRunning() { return running != null; }
+
+    /** Re-reads the config, after a mapping saved in Launcher settings. */
+    static void reloadConfig() {
+        HomeKeyService service = running;
+        if (service != null) service.loadConfig();
+    }
+
     @Override
     protected void onServiceConnected() {
         super.onServiceConnected();
@@ -231,6 +251,12 @@ public class HomeKeyService extends AccessibilityService {
         if (powerOnUntil != 0 && event.getAction() == KeyEvent.ACTION_DOWN
                 && event.getKeyCode() != KeyEvent.KEYCODE_POWER && event.getKeyCode() != KeyEvent.KEYCODE_WAKEUP) {
             powerOnUntil = 0;
+        }
+        // Fork (Thomas): the learn mode takes the next non-navigation key, whole (down and up), and reports it on up.
+        KeyLearner l = learner;
+        if (l != null && !LEARN_RESERVED.contains(event.getKeyCode())) {
+            if (event.getAction() == KeyEvent.ACTION_UP) l.onKey(event.getKeyCode(), event.getScanCode());
+            return true;
         }
         if (consumeVolumeKeys && VolumeKeys.handle(this, event)) return true;
         // A scancode entry is more specific than any keycode, so it goes first.
