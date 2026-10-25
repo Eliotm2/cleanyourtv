@@ -83,8 +83,15 @@ final class Weather {
 
     /** The last reading saved by {@link #fetch}, or null. Main thread is fine: one small preferences read. */
     static Data cached(Context ctx) {
-        String s = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("last", null);
+        return cached(ctx, null);
+    }
+
+    /** The last reading, only if it was fetched for {@code city} (null: whatever city). */
+    static Data cached(Context ctx, String city) {
+        SharedPreferences prefs = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        String s = prefs.getString("last", null);
         if (s == null) return null;
+        if (city != null && !city.trim().equals(prefs.getString("last_query", null))) return null;
         try {
             return Data.fromJson(new JSONObject(s));
         } catch (JSONException e) {
@@ -129,7 +136,7 @@ final class Weather {
                 Data d = parse(name, get(url));
                 d.source = model.startsWith("meteoswiss") ? "MétéoSuisse" : "Open-Meteo";
                 d.fetchedAt = System.currentTimeMillis();
-                prefs.edit().putString("last", d.toJson().toString()).apply();
+                prefs.edit().putString("last", d.toJson().toString()).putString("last_query", city.trim()).apply();
                 return d;
             } catch (IOException | JSONException e) {
                 last = e;

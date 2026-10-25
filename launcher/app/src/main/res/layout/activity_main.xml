@@ -292,24 +292,25 @@
 
             </LinearLayout>
 
-            <!-- Shown only when show_stats is on. Outside leftBlock, so the top buttons stay level with the clock
-                 row; gone, it takes no space. -->
-            <TextView
+            <!-- Shown only when show_stats is on. Fork (Thomas): RAM and storage (and CPU when the TV lets it be read)
+                 as small pills with a ring, under the date. Outside leftBlock, so the top buttons stay level with the
+                 clock row; gone, it takes no space. -->
+            <LinearLayout
                 android:id="@+id/stats"
                 android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
                 android:layout_below="@id/leftBlock"
                 android:layout_alignStart="@id/leftBlock"
-                android:gravity="left"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:singleLine="true"
-                android:ellipsize="end"
-                android:textColor="#D9FFFFFF"
-                android:textSize="14sp"
-                android:fontFamily="@string/font_medium"
-                android:letterSpacing="0.04"
+                android:layout_marginTop="10dp"
+                android:layout_marginStart="4dp"
+                android:orientation="horizontal"
                 android:focusable="false"
-                android:visibility="gone" />
+                android:visibility="gone">
+
+                <TextView android:id="@+id/statCpu" style="@style/StatPill" />
+                <TextView android:id="@+id/statRam" style="@style/StatPill" />
+                <TextView android:id="@+id/statDisk" style="@style/StatPill" />
+            </LinearLayout>
 
             <LinearLayout
                 android:id="@+id/topButtons"
@@ -375,6 +376,18 @@
                 android:gravity="right"
                 android:focusable="false"
                 android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/weatherCity"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="2dp"
+                    android:singleLine="true"
+                    android:textColor="#8CFFFFFF"
+                    android:textSize="11sp"
+                    android:fontFamily="@string/font_medium"
+                    android:letterSpacing="0.22"
+                    android:textAllCaps="true" />
 
                 <LinearLayout
                     android:layout_width="wrap_content"

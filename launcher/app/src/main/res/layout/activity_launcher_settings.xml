@@ -117,6 +117,12 @@
             android:layout_marginTop="28dp"
             android:visibility="gone" />
 
+        <!-- Fork (Thomas): the weather city, typed with the remote's keyboard. -->
+        <TextView
+            android:id="@+id/weatherCityChoice"
+            style="@style/SettingsRow"
+            android:layout_marginTop="18dp" />
+
         <TextView
             android:id="@+id/followThemeChoice"
             style="@style/SettingsRow"

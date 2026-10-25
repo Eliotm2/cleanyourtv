@@ -36,9 +36,9 @@
     <string name="shamsi_month_dey">Dey</string>
     <string name="shamsi_month_bahman">Bahman</string>
     <string name="shamsi_month_esfand">Esfand</string>
-    <string name="stats_cpu">CPU %1$d%%</string>
-    <string name="stats_memory">Memory %1$d / %2$d MB</string>
-    <string name="stats_storage">Storage %1$s free</string>
+    <string name="stats_cpu">CPU %1$d %%</string>
+    <string name="stats_ram">RAM %1$d %%</string>
+    <string name="stats_disk">Storage %1$d %%</string>
     <string name="storage_gb_whole">%1$.0f GB</string>
     <string name="storage_gb_decimal">%1$.1f GB</string>
     <string name="dream_name">Clock</string>
@@ -157,9 +157,12 @@
         <item>Showers</item><item>Snow showers</item><item>Thunderstorm</item><item>Thunderstorm with hail</item><item>—</item>
     </string-array>
     <string name="weather_now">%1$d°  %2$s</string>
-    <string name="weather_max_min">%1$d° / %2$d°</string>
+    <string name="weather_max_min">Max %1$d° · Min %2$d°</string>
     <string name="weather_snow_line">Snow above %1$s</string>
-    <string name="weather_sun">%1$s – %2$s</string>
+    <string name="weather_sun">Sun %1$s – %2$s</string>
     <string name="weather_tomorrow">Tomorrow: %1$s · %2$d° / %3$d°</string>
+    <string name="weather_city_state">Weather city: %1$s</string>
+    <string name="weather_city_title">Weather city</string>
+    <string name="weather_city_hint">Town or village, then OK</string>
     <string name="weather_unavailable">Weather unavailable</string>
 </resources>

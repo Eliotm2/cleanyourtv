@@ -133,6 +133,8 @@ final class Config {
     final boolean showHomeSettingsShortcut;
     /** One line under the clock: CPU, free memory, free storage. Off unless config or a theme turns it on. */
     final boolean showStats;
+    /** Fork (Thomas): the weather city chosen in Launcher settings (launcher_settings). */
+    static final String WEATHER_CITY_KEY = "weather_city";
     // Fork (Thomas): set after construction in load(), to leave the positional constructor alone.
     boolean showWeather;
     String weatherCity = "", weatherLat = "", weatherLon = "";
@@ -662,6 +664,9 @@ final class Config {
                 consumeVolumeKeys, powerOnHome, wifiStatusWarnings, topBarApps, showGreeting, headerWhite, clockWallpaper,
                 Math.max(0, Math.min(90, clockWallpaperDim)), clockGlow, glassStyle, singleRow && dockRow, dockBandAll, lunar, lunarOffset,
                 dateBelowClock);
+        // The city chosen on the TV (Launcher settings) wins over config.xml and a theme.
+        String chosenCity = choices.getString(WEATHER_CITY_KEY, "").trim();
+        if (!chosenCity.isEmpty()) weatherCity = chosenCity;
         c.showWeather = showWeather && !weatherCity.isEmpty();
         c.weatherCity = weatherCity;
         c.weatherLat = weatherLat;

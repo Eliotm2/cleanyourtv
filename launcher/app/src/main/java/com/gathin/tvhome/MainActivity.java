@@ -184,10 +184,12 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private TextView lunarDate;
     private boolean lunar;
     private int lunarOffset;
-    private TextView stats;
+    private View stats;
+    private TextView statCpu, statRam, statDisk;
+    private RingDrawable ringCpu, ringRam, ringDisk;
     // Fork (Thomas): weather block under the pills, and the night mode.
     private View weatherView;
-    private TextView weatherTemp, weatherDesc, weatherDetail;
+    private TextView weatherCityView, weatherTemp, weatherDesc, weatherDetail;
     private boolean showWeather;
     private String weatherCity, weatherLat, weatherLon;
     private long weatherRefreshMs;
@@ -490,6 +492,17 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         btnWifi = findViewById(R.id.btnWifi);
         shamsiDate = findViewById(R.id.shamsiDate);
         stats = findViewById(R.id.stats);
+        statCpu = findViewById(R.id.statCpu);
+        statRam = findViewById(R.id.statRam);
+        statDisk = findViewById(R.id.statDisk);
+        int ringPx = Math.round(16 * getResources().getDisplayMetrics().density);
+        float strokePx = 2.2f * getResources().getDisplayMetrics().density;
+        ringCpu = new RingDrawable(ringPx, strokePx);
+        ringRam = new RingDrawable(ringPx, strokePx);
+        ringDisk = new RingDrawable(ringPx, strokePx);
+        statCpu.setCompoundDrawablesRelative(ringCpu, null, null, null);
+        statRam.setCompoundDrawablesRelative(ringRam, null, null, null);
+        statDisk.setCompoundDrawablesRelative(ringDisk, null, null, null);
         raceCalendar = cfg.raceCalendar;
         racePanel = findViewById(R.id.racePanel);
         raceKicker = findViewById(R.id.raceKicker);
@@ -497,6 +510,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         raceSessions = findViewById(R.id.raceSessions);
         showStats = cfg.showStats;
         weatherView = findViewById(R.id.weather);
+        weatherCityView = findViewById(R.id.weatherCity);
         weatherTemp = findViewById(R.id.weatherTemp);
         weatherDesc = findViewById(R.id.weatherDesc);
         weatherDetail = findViewById(R.id.weatherDetail);
@@ -509,7 +523,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         nightIdleMs = cfg.nightIdleMinutes * MINUTE_MS;
         nightFrom = cfg.nightFrom;
         nightTo = cfg.nightTo;
-        if (showWeather) showWeather(Weather.cached(this));
+        if (showWeather) showWeather(Weather.cached(this, weatherCity));
         shamsi = cfg.shamsiDate;
         lunarDate = findViewById(R.id.lunarDate);
         lunar = cfg.lunarDate;
@@ -1188,6 +1202,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
         android.content.res.Resources res = getResources();
         Locale locale = res.getConfiguration().getLocales().get(0);
+        weatherCityView.setText(d.city);
         weatherTemp.setText(String.format(locale, "%d°", d.temp));
         String[] descs = res.getStringArray(R.array.weather_desc);
         weatherDesc.setText(descs[Weather.descIndex(d.code)]);
@@ -1205,7 +1220,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         weatherThread.start();
         Handler bg = new Handler(weatherThread.getLooper());
         weatherBg = bg;
-        Weather.Data cached = Weather.cached(this);
+        Weather.Data cached = Weather.cached(this, weatherCity);
         long age = cached == null ? Long.MAX_VALUE : System.currentTimeMillis() - cached.fetchedAt;
         long delay = age >= weatherRefreshMs ? 0 : weatherRefreshMs - age;
         bg.postDelayed(new Runnable() {
@@ -1237,7 +1252,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     /** A network came back: fetch now if the reading is stale, by restarting the reader. */
     private void refreshWeatherIfStale() {
         if (!showWeather || weatherThread == null) return;
-        Weather.Data cached = Weather.cached(this);
+        Weather.Data cached = Weather.cached(this, weatherCity);
         if (cached != null && System.currentTimeMillis() - cached.fetchedAt < weatherRefreshMs) return;
         stopWeather();
         startWeather();
@@ -2154,9 +2169,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             @Override
             public void run() {
                 if (statsBg != bg) return;
-                String line = readStatsLine();
+                int[] pct = readStats();
                 handler.post(() -> {
-                    if (showStats && stats != null && statsBg == bg) stats.setText(line);
+                    if (showStats && stats != null && statsBg == bg) showStats(pct);
                 });
                 if (statsBg == bg) bg.postDelayed(this, STATS_MS);
             }
@@ -2174,31 +2189,50 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         if (!showStats) stats.setVisibility(View.GONE);
     }
 
-    /** One quiet line, e.g. "CPU 8%  ·  Memory 430 MB free  ·  Storage 3.1 GB free". Runs off the main thread. */
     private static void appendStat(StringBuilder line, String part) {
         if (line.length() > 0) line.append("  ·  ");
         line.append(part);
     }
 
-    private String readStatsLine() {
+    /**
+     * Fork (Thomas): {cpu, ram, storage} in percent used; -1 where the TV does not let it be read (Android 8 and
+     * later hide /proc/stat from apps on many TVs, the TCL G08 among them). Runs off the main thread.
+     */
+    private int[] readStats() {
         int cpu = cpuPercent();
         if (cpu < 0) {
             try {
-                Thread.sleep(200);             // second sample, so the first line already has a CPU figure
+                Thread.sleep(200);             // second sample, so the first reading already has a CPU figure
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                return "";
+                return new int[] {-1, -1, -1};
             }
             cpu = cpuPercent();
         }
-        // Android 8 and later hide /proc/stat from apps on many TVs: then the line leaves CPU out rather than
-        // showing a dash that never fills in.
-        StringBuilder line = new StringBuilder();
-        if (cpu >= 0) line.append(getString(R.string.stats_cpu, cpu));
         long[] mem = memUsedOfTotalMb();
-        if (mem != null) appendStat(line, getString(R.string.stats_memory, mem[0], mem[1]));
-        // Fork (Thomas): CPU and memory only; the storage figure is left out.
-        return StatsText.forLocale(line.toString(), getResources().getConfiguration().getLocales().get(0));
+        int ram = mem == null || mem[1] <= 0 ? -1 : (int) Math.round(100.0 * mem[0] / mem[1]);
+        File data = Environment.getDataDirectory();
+        long total = data.getTotalSpace();
+        int disk = total <= 0 ? -1 : (int) Math.round(100.0 * (total - data.getFreeSpace()) / total);
+        return new int[] {cpu < 0 ? -1 : cpu, ram, disk};
+    }
+
+    /** Main thread: one pill per readable figure, ring and text. */
+    private void showStats(int[] pct) {
+        Locale locale = getResources().getConfiguration().getLocales().get(0);
+        showStat(statCpu, ringCpu, R.string.stats_cpu, pct[0], locale);
+        showStat(statRam, ringRam, R.string.stats_ram, pct[1], locale);
+        showStat(statDisk, ringDisk, R.string.stats_disk, pct[2], locale);
+    }
+
+    private void showStat(TextView pill, RingDrawable ring, int format, int percent, Locale locale) {
+        if (percent < 0) {
+            pill.setVisibility(View.GONE);
+            return;
+        }
+        ring.setFraction(percent / 100f);
+        pill.setText(StatsText.forLocale(getString(format, percent), locale));
+        pill.setVisibility(View.VISIBLE);
     }
 
     // -1: need another sample. -2: this source cannot be read (Android 9 hides /proc/stat from apps).
@@ -2310,13 +2344,6 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         } catch (IOException e) {
             return null;
         }
-    }
-
-    private static String formatGb(Resources res, long bytes) {
-        if (bytes <= 0) return "";
-        double gb = bytes / (1024.0 * 1024 * 1024);
-        return gb >= 10 ? res.getString(R.string.storage_gb_whole, gb)
-                : res.getString(R.string.storage_gb_decimal, gb);
     }
 
     // ---- navigation ------------------------------------------------------------------------------

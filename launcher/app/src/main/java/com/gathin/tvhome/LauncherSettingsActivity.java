@@ -32,6 +32,7 @@ public final class LauncherSettingsActivity extends Activity {
     private TextView advancedChoice;
     private TextView followThemeChoice;
     private TextView openOnStartChoice;
+    private TextView weatherCityChoice;   // fork (Thomas)
     private int columns;
     private int rowsBelowDock;
     private int dockOpacity;
@@ -128,12 +129,14 @@ public final class LauncherSettingsActivity extends Activity {
             openOnStartChoice.setVisibility(View.VISIBLE);
             openOnStartChoice.setOnClickListener(v -> showOpenOnStartPicker());
         }
+        weatherCityChoice = findViewById(R.id.weatherCityChoice);
+        weatherCityChoice.setOnClickListener(v -> showWeatherCityDialog());
         followThemeChoice = findViewById(R.id.followThemeChoice);
         followThemeChoice.setOnClickListener(v -> {
             if (!hasOnTvChoices()) return;
             choices.edit().remove("columns").remove(Config.ROWS_BELOW_DOCK_KEY).remove("animations")
                     .remove("advanced_effects").remove(Config.WALLPAPER_CHOICE_KEY)
-                    .remove(Config.DOCK_OPACITY_KEY).remove(OpenOnStart.KEY).commit();
+                    .remove(Config.DOCK_OPACITY_KEY).remove(OpenOnStart.KEY).remove(Config.WEATHER_CITY_KEY).commit();
             Config current = Config.load(this);
             columns = current.columns;
             rowsBelowDock = current.rowsBelowDock;
@@ -291,6 +294,7 @@ public final class LauncherSettingsActivity extends Activity {
                         : wallpaperCurrent != null ? wallpaperCurrent
                         : getString(R.string.wallpaper_theme_default)));
         openOnStartChoice.setText(getString(R.string.open_on_start_state, openOnStartLabel()));
+        weatherCityChoice.setText(getString(R.string.weather_city_state, Config.load(this).weatherCity));
         followThemeChoice.setSelected(!hasOnTvChoices());
     }
 
@@ -298,7 +302,28 @@ public final class LauncherSettingsActivity extends Activity {
         return choices.contains("columns") || choices.contains(Config.ROWS_BELOW_DOCK_KEY)
                 || choices.contains("animations") || choices.contains("advanced_effects")
                 || choices.contains(Config.WALLPAPER_CHOICE_KEY) || choices.contains(Config.DOCK_OPACITY_KEY)
-                || choices.contains(OpenOnStart.KEY);
+                || choices.contains(OpenOnStart.KEY) || choices.contains(Config.WEATHER_CITY_KEY);
+    }
+
+    /** Fork (Thomas): the weather city, typed with the remote's keyboard; empty puts the theme's or config.xml's back. */
+    private void showWeatherCityDialog() {
+        android.widget.EditText input = new android.widget.EditText(this);
+        input.setSingleLine(true);
+        input.setHint(R.string.weather_city_hint);
+        input.setText(choices.getString(Config.WEATHER_CITY_KEY, ""));
+        input.setSelection(input.getText().length());
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.weather_city_title)
+                .setView(input)
+                .setPositiveButton(android.R.string.ok, (d, w) -> {
+                    String city = input.getText().toString().trim();
+                    if (city.isEmpty()) choices.edit().remove(Config.WEATHER_CITY_KEY).apply();
+                    else choices.edit().putString(Config.WEATHER_CITY_KEY, city).apply();
+                    changed();
+                    refresh();
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
     }
 
     private void open(Intent intent) {

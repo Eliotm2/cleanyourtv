@@ -23,8 +23,6 @@
     <string name="cant_open">Kan ikke åbne %1$s</string>
     <string name="date_format">EEEE d. MMMM</string>
     <string name="stats_cpu">CPU %1$d%%</string>
-    <string name="stats_memory">Hukommelse %1$d / %2$d MB</string>
-    <string name="stats_storage">Lager %1$s ledigt</string>
     <string name="storage_gb_whole">%1$.0f GB</string>
     <string name="storage_gb_decimal">%1$.1f GB</string>
     <string name="dream_name">Ur</string>
