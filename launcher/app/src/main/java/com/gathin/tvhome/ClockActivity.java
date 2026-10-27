@@ -18,6 +18,11 @@ import java.util.Locale;
  * the backlight asked for its lowest level, and tomorrow's weather from the last reading under the date.
  */
 public class ClockActivity extends Activity {
+    @Override
+    protected void attachBaseContext(android.content.Context base) {
+        super.attachBaseContext(LauncherLocale.wrap(base));   // locale
+    }
+
 
     static final String EXTRA_NIGHT = "night";
 
