@@ -16,8 +16,8 @@ android {
         minSdk 26
         targetSdk 34
         // Fork (Thomas): above upstream's 9 so the phone app offers the update; the suffix names the fork.
-        versionCode 15
-        versionName '3.0-thomas.6'
+        versionCode 16
+        versionName '3.0-thomas.7'
     }
 
     signingConfigs {

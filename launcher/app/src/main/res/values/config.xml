@@ -346,6 +346,10 @@
     <!-- Grid rows left visible under the dock on the home screen. 0 = dock sits at the very bottom. Tiles shrink if
          the dock, its title and this many rows would not otherwise fit the screen height. -->
     <integer name="rows_below_dock">0</integer>
+    <!-- Fork (Thomas). Room under the dock band, in dp. Upstream leaves 30, which shows the top 30 dp of the next
+         grid row under the dock as a hint that Down scrolls to it; 0 puts that row entirely off screen and the
+         dock at the bottom edge (the band keeps its own 12 dp). Theme key: "dock_bottom_room". -->
+    <integer name="dock_bottom_room">0</integer>
 
     <!-- The focused dock app's name in large type above the dock. false keeps only the glow, which leaves room
          for bigger tiles when rows_below_dock is 2 or 3. -->
