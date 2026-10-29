@@ -15,9 +15,9 @@ android {
         applicationId providers.gradleProperty('launcherApplicationId').getOrElse('com.gathin.tvhome')
         minSdk 26
         targetSdk 34
-        // Fork (Thomas): above upstream's 9 so the phone app offers the update; the suffix names the fork.
-        versionCode 16
-        versionName '3.0-thomas.7'
+        // Fork (Thomas): above upstream's code so the phone app offers the update; <upstream>-thomas.N names the fork.
+        versionCode 17
+        versionName '3.2-thomas.1'
     }
 
     signingConfigs {

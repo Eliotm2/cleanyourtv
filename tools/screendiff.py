@@ -52,6 +52,16 @@ def output_path(option, path):
     return target
 
 
+def same_file(first, second):
+    """Resolve spelling and symlink aliases, then check existing files for hardlinks."""
+    if first.resolve() == second.resolve():
+        return True
+    try:
+        return first.samefile(second)
+    except FileNotFoundError:
+        return False
+
+
 def write(image, path):
     """Save one picture, naming the path and the reason if it cannot be written.
 
@@ -63,6 +73,29 @@ def write(image, path):
         image.save(path)
     except (OSError, ValueError) as e:
         raise ValueError(f"cannot write {path}: {getattr(e, 'strerror', None) or e}") from e
+
+
+def screenshot(which, path):
+    """The picture at `path`, decoded now, named as the argument it was given as.
+
+    Image.open() reads only the header, so a screenshot whose copy was cut short - an interrupted
+    `tools/tv.py --screenshot`, a file pulled off the TV before the write finished, a download that
+    stopped early - opens here without complaint and fails on the first pixel read, inside the
+    comparison. Left alone that is an OSError traceback with exit 1, the status the page reads as
+    "different: N pixels differ ... find out why before posting": a finding about the launcher from a
+    file nothing could be read out of. Decoding it here answers it as the unreadable file it is, with
+    the before or after argument named.
+    """
+    from PIL import Image
+    image = None
+    try:
+        image = Image.open(path)
+        image.load()
+    except OSError as e:
+        if image is not None:
+            image.close()   # the file is open; a refusal should not leave the handle for the GC
+        raise ValueError(f"cannot read the {which} screenshot {path}: {e}. Nothing was compared.")
+    return image
 
 
 def compare(a, b, masks, threshold):
@@ -142,21 +175,27 @@ def parse(argv):
 
 def main(argv=None):
     args = parse(sys.argv[1:] if argv is None else argv)
+    used = [("the before screenshot", Path(args.before)), ("the after screenshot", Path(args.after))]
     for option, path in (("--out", args.out), ("--diff", args.diff)):
         try:
-            output_path(option, path)
-        except ValueError as e:
+            target = output_path(option, path)
+            if target is not None:
+                for label, other in used:
+                    if same_file(target, other):
+                        raise ValueError(f"{option} {path} is the same file as {label} {other}")
+                used.append((option, target))
+        except (ValueError, OSError, RuntimeError) as e:
             print(f"{e}. Nothing was read or written.", file=sys.stderr)
             return 2
     try:
-        from PIL import Image
+        import PIL  # noqa: F401 - the check; screenshot() reads Image when it is about to decode
     except ImportError:
         print("screendiff.py needs Pillow: tools/venv/bin/pip install -r tools/requirements-perf.txt", file=sys.stderr)
         return 2
     try:
-        a, b = Image.open(args.before), Image.open(args.after)
-    except OSError as e:
-        print(f"cannot read a screenshot: {e}", file=sys.stderr)
+        a, b = screenshot("before", args.before), screenshot("after", args.after)
+    except ValueError as e:
+        print(e, file=sys.stderr)
         return 2
     if a.size != b.size:
         print(f"the screenshots differ in size: {a.size[0]}x{a.size[1]} and {b.size[0]}x{b.size[1]}", file=sys.stderr)

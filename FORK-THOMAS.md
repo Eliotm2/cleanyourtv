@@ -1,8 +1,9 @@
 # Fork « thomas » du launcher Clean Your TV
 
-Branche `thomas` de [Gathin23/cleanyourtv](https://github.com/Gathin23/cleanyourtv) (launcher 3.0 amont `b06ab21`,
-licence MIT), pour la TCL 65Q6C de Thomas. Seul le dossier `launcher/` change ; le reste du dépôt est tel quel.
-Version `3.0-thomas.N`, `versionCode` toujours au-dessus de l'amont.
+Branche `thomas` de [Gathin23/cleanyourtv](https://github.com/Gathin23/cleanyourtv) (launcher 3.2 amont `v3.2.0`,
+licence MIT), pour la TCL 65Q6C de Thomas. Seul le dossier `launcher/` change (plus nos workflows `thomas-*` ; ceux
+de l'amont sont retirés). Version `<version amont>-thomas.N` (3.2-thomas.1), `versionCode` toujours au-dessus de
+l'amont ; N repart à 1 à chaque nouvelle version amont.
 
 ## Ce que le fork ajoute (tout dans `launcher/`)
 
@@ -36,6 +37,19 @@ Avant de reprendre nos ajouts sur une nouvelle version amont, et à chaque fois 
 3. Si c'est le même résultat : proposer à Thomas de retirer notre version au profit de la sienne, et lui dire quel
    réglage activer. Ne retirer qu'après son essai sur la télé.
 4. Si c'est seulement proche : garder la nôtre, l'inscrire dans « Comparé à l'amont et gardé », et le signaler.
+
+## Reprise automatique et publication
+
+`.github/workflows/thomas-launcher.yml` :
+- chaque nuit (01:07 UTC) et à la demande : `.github/thomas/launcher-sync.sh` fusionne la dernière release amont
+  (tag `vX.Y.Z` de Gathin23/cleanyourtv). Réglé seul : la version (`launcher-version.py`), les workflows amont, les
+  fichiers que le fork a supprimés (`layout-iw`, `layout-zh`), les traductions des chaînes retirées (`stats_memory`,
+  `stats_storage`). Tout autre conflit : arrêt et issue.
+- puis, et à chaque push sur `thomas` dont la version n'a pas de release : tests, lint, APK signé (clé, paquet et
+  version vérifiés), release `launcher-<version>` avec l'APK.
+- l'appli (`Eliotm2/cleanyourtv-app`, 01:37 UTC) embarque la dernière release `launcher-*` et prend son numéro.
+
+Secrets du dépôt : `KEYSTORE_B64`, `KEYSTORE_PROPERTIES` (les mêmes que pour l'appli). Branche par défaut : `thomas`.
 
 ## Compiler
 

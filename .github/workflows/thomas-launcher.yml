@@ -1,0 +1,130 @@
+# Fork (Thomas): the launcher (TV home screen). Every night, take the latest release of the original
+# launcher (Gathin23/cleanyourtv, tags vX.Y.Z), merge it into `thomas` with our additions, run the tests
+# and lint, build the APK signed with the fork's key and publish it as release launcher-<version>.
+# The phone app (Eliotm2/cleanyourtv-app, thomas-sync.yml, half an hour later) takes that release.
+# Also on every push to `thomas`: a version with no release yet gets one (the versions made by hand).
+# When the merge needs a person, nothing is pushed and an issue says why.
+#
+# Secrets (Settings > Secrets and variables > Actions):
+#   KEYSTORE_B64         the keystore (accueil.jks), base64
+#   KEYSTORE_PROPERTIES  storePassword, keyAlias, keyPassword (storeFile is set here)
+name: Thomas · launcher
+
+on:
+  schedule:
+    - cron: "7 1 * * *"   # 01:07 UTC, before the app's 01:37
+  push:
+    branches: [thomas]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: thomas-launcher
+  cancel-in-progress: false
+
+jobs:
+  launcher:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: thomas
+          fetch-depth: 0
+
+      - name: Identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898099+github-actions[bot]@users.noreply.github.com"
+
+      - name: Merge the latest upstream launcher release
+        id: sync
+        if: github.event_name != 'push'
+        run: |
+          set +e
+          .github/thomas/launcher-sync.sh
+          code=$?
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          [ $code -eq 0 ] || [ $code -eq 2 ]
+
+      - name: Version, and whether it is already published
+        id: v
+        if: steps.sync.outputs.code != '2'
+        run: |
+          version=$(sed -n "s/^ *versionName '\([^']*\)'.*/\1/p" launcher/app/build.gradle | head -1)
+          [ -n "$version" ] || { echo "::error::no versionName in launcher/app/build.gradle"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [ "${{ steps.sync.outputs.new }}" != true ] && gh release view "launcher-$version" >/dev/null 2>&1; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"; echo "launcher-$version is already published"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"; echo "launcher-$version gets a release"
+          fi
+
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
+        if: steps.v.outputs.publish == 'true'
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Signing key
+        if: steps.v.outputs.publish == 'true'
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+          KEYSTORE_PROPERTIES: ${{ secrets.KEYSTORE_PROPERTIES }}
+        run: |
+          [ -n "$KEYSTORE_B64" ] && [ -n "$KEYSTORE_PROPERTIES" ] || { echo "::error::secrets KEYSTORE_B64 and KEYSTORE_PROPERTIES are missing"; exit 1; }
+          printf '%s' "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/thomas.jks"
+          { printf '%s\n' "$KEYSTORE_PROPERTIES" | grep -v '^storeFile='; echo "storeFile=$RUNNER_TEMP/thomas.jks"; } > launcher/keystore.properties
+
+      - name: Tests, lint and signed APK
+        if: steps.v.outputs.publish == 'true'
+        working-directory: launcher
+        run: ./gradlew --no-daemon testReleaseUnitTest lintRelease assembleRelease
+
+      - name: The APK carries the fork's key and this version
+        if: steps.v.outputs.publish == 'true'
+        id: apk
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          apk=launcher/app/build/outputs/apk/release/app-release.apk
+          bt="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
+          signer=$("$bt/apksigner" verify --print-certs "$apk" | sed -n 's/.*certificate SHA-256 digest: //p' | head -1)
+          [ "$signer" = fa73a3a033c6bb075706307ff446928530b90305a198b4349b02c4ce1eae29d5 ] || { echo "::error::APK signed by $signer"; exit 1; }
+          "$bt/aapt2" dump badging "$apk" | head -1 | grep -q "name='com.gathin.tvhome'.*versionName='$VERSION'" || { echo "::error::APK is not com.gathin.tvhome $VERSION"; exit 1; }
+          size=$(stat -c %s "$apk"); echo "APK: $size bytes (upstream size gate: 589824)"
+          cp "$apk" "$RUNNER_TEMP/cleanyourtv-launcher-$VERSION.apk"
+          echo "path=$RUNNER_TEMP/cleanyourtv-launcher-$VERSION.apk" >> "$GITHUB_OUTPUT"
+
+      - name: Commit, push and publish
+        if: steps.v.outputs.publish == 'true'
+        env:
+          TAG: ${{ steps.sync.outputs.tag }}
+          NEW: ${{ steps.sync.outputs.new }}
+          VERSION: ${{ steps.v.outputs.version }}
+          APK: ${{ steps.apk.outputs.path }}
+        run: |
+          rm -f launcher/keystore.properties
+          if [ "$NEW" = true ]; then
+            git commit -q -m "Launcher (fork Thomas) $VERSION : reprise du launcher $TAG (automatique)"
+            git push origin HEAD:thomas
+          fi
+          gh release create "launcher-$VERSION" "$APK" --target "$(git rev-parse HEAD)" --title "Launcher $VERSION" \
+            --notes "Launcher de la télé ($VERSION), avec les ajouts de Thomas$( [ "$NEW" = true ] && echo ", repris de [$TAG](https://github.com/Gathin23/cleanyourtv/releases/tag/$TAG)" ). Signé avec la clé du fork. L'appli Clean Your TV · Thomas l'embarque à sa reprise suivante."
+
+      - name: Say why it stopped
+        if: always() && (steps.sync.outputs.code == '2' || failure())
+        env:
+          TAG: ${{ steps.sync.outputs.tag }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="Launcher ${TAG:-} : à regarder"
+          body=$( [ -f "$RUNNER_TEMP/reason.md" ] && cat "$RUNNER_TEMP/reason.md" || echo "La compilation, les tests, le lint ou la publication ont échoué." )
+          body="$body"$'\n\n'"Rien n'a été publié ; le launcher installé reste valable. Détail : $RUN"
+          existing=$(gh issue list --state open --search "in:title \"$title\"" --json number --jq '.[0].number')
+          [ -n "$existing" ] || gh issue create --title "$title" --body "$body"
